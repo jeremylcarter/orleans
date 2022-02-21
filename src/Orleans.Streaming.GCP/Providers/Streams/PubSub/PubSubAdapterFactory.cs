@@ -58,7 +58,8 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
             var adapter = new PubSubAdapter<TDataAdapter>(_adaptorFactory(), this.loggerFactory, _streamQueueMapper,
-                this.options.ProjectId, this.options.TopicId, this.clusterOptions.ServiceId, this._providerName, this.options.Deadline, this.options.CustomEndpoint);
+                this.options.ProjectId, this.options.TopicId, this.clusterOptions.ServiceId, this._providerName,
+                this.options.Deadline, this.options.CustomEndpoint, this.options.CustomCredentialsPath);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

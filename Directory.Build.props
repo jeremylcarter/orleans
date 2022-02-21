@@ -88,7 +88,7 @@
     <AWSSDKSQSVersion>3.7.2.14</AWSSDKSQSVersion>
     <BondCoreCSharpVersion>5.3.1</BondCoreCSharpVersion>
     <ConsulVersion>1.6.10.4</ConsulVersion>
-    <GoogleCloudPubSubV1Version>1.0.0-beta13</GoogleCloudPubSubV1Version>
+    <GoogleCloudPubSubV1Version>2.7.0</GoogleCloudPubSubV1Version>
     <GoogleProtobufVersion>3.19.3</GoogleProtobufVersion>
     <ProtobufNetVersion>3.0.101</ProtobufNetVersion>
     <NewRelicAgentApiVersion>9.4.0</NewRelicAgentApiVersion>

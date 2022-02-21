@@ -22,12 +22,12 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         public QueueId Id { get; }
 
         public static IQueueAdapterReceiver Create(ILoggerFactory loggerFactory, QueueId queueId, string projectId, string topicId,
-            string serviceId, IPubSubDataAdapter dataAdapter, TimeSpan? deadline = null, string customEndpoint = "")
+            string serviceId, IPubSubDataAdapter dataAdapter, TimeSpan? deadline = null, string customEndpoint = null, string customCredentialsPath = null)
         {
             if (queueId == null) throw new ArgumentNullException(nameof(queueId));
             if (dataAdapter == null) throw new ArgumentNullException(nameof(dataAdapter));
 
-            var pubSub = new PubSubDataManager(loggerFactory, projectId, topicId, queueId.ToString(), serviceId, deadline, customEndpoint);
+            var pubSub = new PubSubDataManager(loggerFactory, projectId, topicId, queueId.ToString(), serviceId, deadline, customEndpoint, customCredentialsPath);
             return new PubSubAdapterReceiver(loggerFactory, queueId, topicId, pubSub, dataAdapter);
         }
 

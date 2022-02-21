@@ -1,14 +1,14 @@
-﻿using System;
+using System;
 
 namespace Orleans.Configuration
 {
     public class PubSubOptions
     {
         public string ProjectId { get; set; }
-
         public string TopicId { get; set; }
-
+        public string SubscriptionId { get; set; }
         public string CustomEndpoint { get; set; }
+        public string CustomCredentialsPath { get; set; }
 
         private TimeSpan? deadline;
         public TimeSpan? Deadline

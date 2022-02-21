@@ -1,4 +1,3 @@
-﻿using Google.Api.Gax.Grpc;
 using Google.Cloud.PubSub.V1;
 using Grpc.Core;
 using Orleans.Runtime;
@@ -20,17 +19,17 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         public TopicName TopicName { get; private set; }
         public SubscriptionName SubscriptionName { get; private set; }
 
-        private Subscription _subscription;
-        private Topic _topic;
-        private PublisherClient _publisher;
-        private SubscriberClient _subscriber;
+        private PublisherServiceApiClient _publisher;
+        private SubscriberServiceApiClient _subscriber;
         private TimeSpan? _deadline;
-        private ServiceEndpoint _customEndpoint;
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Security", "CA2104:DoNotDeclareReadOnlyMutableReferenceTypes")]
         private readonly ILogger _logger;
+        private readonly string _customEndpoint;
+        private readonly string _customCredentialsPath;
 
-        public PubSubDataManager(ILoggerFactory loggerFactory, string projectId, string topicId, string subscriptionId, string serviceId, TimeSpan? deadline = null, string customEndpoint = "")
+        public PubSubDataManager(ILoggerFactory loggerFactory, string projectId, string topicId, string subscriptionId,
+                                 string serviceId, TimeSpan? deadline = null, string customEndpoint = null, string customCredentialsPath = null)
         {
             if (string.IsNullOrWhiteSpace(serviceId)) throw new ArgumentNullException(nameof(serviceId));
             if (string.IsNullOrWhiteSpace(projectId)) throw new ArgumentNullException(nameof(projectId));
@@ -39,29 +38,24 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             _logger = loggerFactory.CreateLogger<PubSubDataManager>();
             _deadline = deadline;
+            _customEndpoint = customEndpoint;
+            _customCredentialsPath = customCredentialsPath;
             topicId = $"{topicId}-{serviceId}";
             subscriptionId = $"{projectId}-{serviceId}";
             TopicName = new TopicName(projectId, topicId);
             SubscriptionName = new SubscriptionName(projectId, subscriptionId);
-
-            if (!string.IsNullOrWhiteSpace(customEndpoint))
-            {
-                var hostPort = customEndpoint.Split(new char[] { ':' }, StringSplitOptions.RemoveEmptyEntries);
-                if (hostPort.Length != 2) throw new ArgumentException(nameof(customEndpoint));
-
-                var host = hostPort[0];
-                int port;
-                if (!int.TryParse(hostPort[1], out port)) throw new ArgumentException(nameof(customEndpoint));
-
-                _customEndpoint = new ServiceEndpoint(host, port);
-            }
         }
 
         public async Task Initialize()
         {
             try
             {
-                _publisher = await PublisherClient.CreateAsync(_customEndpoint);
+                // Custom endpoints and credentials require the use of the Builder api.
+                _publisher = await new PublisherServiceApiClientBuilder()
+                {
+                    CredentialsPath = _customCredentialsPath,
+                    Endpoint = _customEndpoint
+                }.BuildAsync();
             }
             catch (Exception e)
             {
@@ -72,7 +66,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             try
             {
-                _topic = await _publisher.CreateTopicAsync(TopicName);
+                await _publisher.CreateTopicAsync(TopicName);
                 didCreate = true;
             }
             catch (RpcException e)
@@ -80,7 +74,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 if (e.Status.StatusCode != StatusCode.AlreadyExists)
                     ReportErrorAndRethrow(e, "CreateTopicAsync", GoogleErrorCode.Initializing);
 
-                _topic = await _publisher.GetTopicAsync(TopicName);
+                await _publisher.GetTopicAsync(TopicName);
             }
 
             _logger.Info((int)GoogleErrorCode.Initializing, "{0} Google PubSub Topic {1}", (didCreate ? "Created" : "Attached to"), TopicName.TopicId);
@@ -89,8 +83,11 @@ namespace Orleans.Providers.GCP.Streams.PubSub
 
             try
             {
-                _subscriber = await SubscriberClient.CreateAsync(_customEndpoint);
-                _subscription = await _subscriber.CreateSubscriptionAsync(SubscriptionName, TopicName, pushConfig: null,
+                // Custom endpoints and credentials require the use of the Builder api.
+                _subscriber = await new SubscriberServiceApiClientBuilder() {
+                    CredentialsPath = _customCredentialsPath,
+                    Endpoint = _customEndpoint }.BuildAsync();
+                await _subscriber.CreateSubscriptionAsync(SubscriptionName, TopicName, pushConfig: null,
                     ackDeadlineSeconds: _deadline.HasValue ? (int)_deadline.Value.TotalSeconds : 60);
                 didCreate = true;
             }
@@ -99,7 +96,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
                 if (e.Status.StatusCode != StatusCode.AlreadyExists)
                     ReportErrorAndRethrow(e, "CreateSubscriptionAsync", GoogleErrorCode.Initializing);
 
-                _subscription = await _subscriber.GetSubscriptionAsync(SubscriptionName);
+                await _subscriber.GetSubscriptionAsync(SubscriptionName);
             }
             _logger.Info((int)GoogleErrorCode.Initializing, "{0} Google PubSub Subscription {1} to Topic {2}", (didCreate ? "Created" : "Attached to"), SubscriptionName.SubscriptionId, TopicName.TopicId);
         }
@@ -143,7 +140,8 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             try
             {
                 //According to Google, no more than 1000 messages can be published/received
-                response = await _subscriber?.PullAsync(SubscriptionName, true, count < 1 ? MAX_PULLED_MESSAGES : count);
+                // What will happen with PullAsync 
+                response = await _subscriber?.PullAsync(SubscriptionName, count < 1 ? MAX_PULLED_MESSAGES : count);
             }
             catch (Exception exc)
             {

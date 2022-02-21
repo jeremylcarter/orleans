@@ -22,6 +22,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
         private readonly ILogger _logger;
         private readonly ILoggerFactory loggerFactory;
         private readonly string _customEndpoint;
+        private readonly string _customCredentialsPath;
         public string Name { get; }
         public bool IsRewindable => false;
         public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
@@ -35,7 +36,8 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             string serviceId,
             string providerName,
             TimeSpan? deadline = null, 
-            string customEndpoint = "")
+            string customEndpoint = null,
+            string customCredentialsPath = null)
         {
             if (string.IsNullOrEmpty(projectId)) throw new ArgumentNullException(nameof(projectId));
             if (string.IsNullOrEmpty(topicId)) throw new ArgumentNullException(nameof(topicId));
@@ -51,11 +53,12 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             _streamQueueMapper = streamQueueMapper;
             _dataAdapter = dataAdapter;
             _customEndpoint = customEndpoint;
+            _customCredentialsPath = customCredentialsPath;
         }
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            return PubSubAdapterReceiver.Create(this.loggerFactory, queueId, ProjectId, TopicId, ServiceId, _dataAdapter, Deadline, _customEndpoint);
+            return PubSubAdapterReceiver.Create(this.loggerFactory, queueId, ProjectId, TopicId, ServiceId, _dataAdapter, Deadline, _customEndpoint, _customCredentialsPath);
         }
 
         public async Task QueueMessageBatchAsync<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
@@ -66,7 +69,7 @@ namespace Orleans.Providers.GCP.Streams.PubSub
             PubSubDataManager pubSub;
             if (!Subscriptions.TryGetValue(queueId, out pubSub))
             {
-                var tmpPubSub = new PubSubDataManager(this.loggerFactory, ProjectId, TopicId, queueId.ToString(), ServiceId, Deadline);
+                var tmpPubSub = new PubSubDataManager(this.loggerFactory, ProjectId, TopicId, queueId.ToString(), ServiceId, Deadline, _customEndpoint, _customCredentialsPath);
                 await tmpPubSub.Initialize();
                 pubSub = Subscriptions.GetOrAdd(queueId, tmpPubSub);
             }
